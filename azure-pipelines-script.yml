@@ -1,0 +1,41 @@
+parameters:
+- name: SelectedBuildID
+  displayName: 'Select Build ID'
+  type: string
+  default: '123' # Default value, replace with your default ID
+  values: []
+
+trigger: none
+
+pr: none
+
+jobs:
+- job: FetchBuildIDs
+  pool:
+    vmImage: 'windows-latest'
+  steps:
+  - task: PowerShell@2
+    inputs:
+      targetType: 'inline'
+      script: |
+        $organization = "DevopsPractiseOrganization"
+        $project = "BasicJavaWebapp"
+        $pat = "j64qu27xc5mvq7fxfkazmig4vvuezjdg37p77fod2mmkxjiemt3a" # Personal Access Token with necessary permissions
+        
+        $pipelineId = "16" # ID of the pipeline from which you want to fetch build IDs
+        $url = "https://dev.azure.com/$organization/$project/_apis/build/builds?definitions=$pipelineId&api-version=8.0"
+
+        $headers = @{
+          Authorization = "Bearer $pat"
+        }
+
+        $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
+        $buildIDs = $response.value | ForEach-Object { $_.id.ToString() }
+
+        Write-Host "Fetched Build IDs: $($buildIDs -join ',')"
+        Write-Host "##vso[task.setvariable variable=BuildIDs;isOutput=true]$($buildIDs -join ',')"
+  - script: |
+      $buildIDs = "$(FetchBuildIDs.BuildIDs)"
+      $buildIDArray = $buildIDs -split ','
+      $buildIDArray | ForEach-Object { Write-Host "##vso[task.setvariable variable=BuildIDValues]$_" }
+    displayName: 'Set Build IDs'
